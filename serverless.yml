@@ -1,0 +1,60 @@
+service: Weather-api
+
+
+provider:
+  name: aws
+  runtime: java11
+  environment:
+    TABLE: ${self:service}-${sls:stage}-WeatherDataTable-${sls:instanceId}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:provider.environment.TABLE}"
+  stage: dev
+  region: us-east-1
+
+package:
+  artifact: target/aws-serverless-framework-app-dev.jar
+
+functions:
+  getWeatherData:
+    handler: com.home.amazon.serverless.lambda.PostItemFunction
+    events:
+      - http:
+          path: /weather
+          method: post
+          request:
+            parameters:
+              querystrings:
+                city: true
+  getAllWeatherData:
+    handler: com.home.amazon.serverless.lambda.GetItemFunction
+    events:
+      - http:
+          path: /weather/all
+          method: get
+
+resources:
+  Resources:
+    WeatherDataDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: cityName
+            AttributeType: S
+        KeySchema:
+          - AttributeName: cityName
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        SSESpecification:
+          SSEEnabled: true
+        TableName: ${self:provider.environment.TABLE}
